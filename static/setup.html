@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create admin — MongoDB Utils</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-slate-50 text-slate-900 min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-sm bg-white rounded-xl border shadow-sm p-6">
+      <h1 class="text-lg font-semibold tracking-tight">Create admin</h1>
+      <p class="text-sm text-slate-500 mt-1">First-time setup. This page closes once an admin exists.</p>
+      <form id="form" class="mt-6 space-y-4">
+        <label class="block text-sm">
+          <span class="text-slate-700">Username</span>
+          <input name="username" required minlength="1" maxlength="64"
+            class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        </label>
+        <label class="block text-sm">
+          <span class="text-slate-700">Password</span>
+          <input name="password" type="password" required minlength="8"
+            class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+          <span class="text-xs text-slate-500 mt-1 block">At least 8 characters.</span>
+        </label>
+        <p id="err" class="hidden text-sm text-red-600"></p>
+        <button class="w-full rounded-md bg-slate-900 text-white text-sm py-2 hover:bg-slate-800">Create admin</button>
+      </form>
+    </div>
+    <script>
+      (async () => {
+        const res = await fetch('/api/auth/status').then(r => r.json());
+        if (!res.needs_setup) location.href = res.user ? '/' : '/login.html';
+      })();
+
+      document.getElementById('form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const body = { username: fd.get('username'), password: fd.get('password') };
+        const r = await fetch('/api/auth/setup', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (r.ok) { location.href = '/'; return; }
+        const err = document.getElementById('err');
+        const data = await r.json().catch(() => ({}));
+        err.textContent = data.error || 'setup failed';
+        err.classList.remove('hidden');
+      });
+    </script>
+  </body>
+</html>
