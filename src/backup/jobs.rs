@@ -22,6 +22,13 @@ pub enum JobSource {
     Scheduled,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum JobKind {
+    Backup,
+    Restore,
+}
+
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct JobProgress {
     pub current_collection: Option<String>,
@@ -32,7 +39,8 @@ pub struct JobProgress {
 #[derive(Debug, Clone, Serialize)]
 pub struct Job {
     pub id: Uuid,
-    pub connection_id: Uuid,
+    pub kind: JobKind,
+    pub connection_id: Option<Uuid>,
     pub connection_label: String,
     pub database: String,
     pub source: JobSource,
@@ -76,13 +84,15 @@ impl JobRegistry {
 
     pub async fn start(
         &self,
-        connection_id: Uuid,
+        kind: JobKind,
+        connection_id: Option<Uuid>,
         connection_label: String,
         database: String,
         source: JobSource,
     ) -> Uuid {
         let job = Job {
             id: Uuid::new_v4(),
+            kind,
             connection_id,
             connection_label,
             database,

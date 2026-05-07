@@ -1,5 +1,5 @@
 use crate::auth::AuthUser;
-use crate::backup::{JobSource, ProgressSink};
+use crate::backup::{JobKind, JobSource, ProgressSink};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use actix_files::NamedFile;
@@ -84,7 +84,8 @@ pub async fn run_now(
     let job_id = state
         .jobs
         .start(
-            conn.id,
+            JobKind::Backup,
+            Some(conn.id),
             conn.label.clone(),
             body.database.clone(),
             JobSource::Manual,

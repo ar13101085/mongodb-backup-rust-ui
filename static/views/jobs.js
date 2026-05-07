@@ -71,24 +71,36 @@ function statusIcon(j) {
 }
 
 function detailFor(j) {
+  const verb = j.kind === 'restore' ? 'restoring' : 'writing';
   if (j.state === 'running') {
     const p = j.progress || {};
     const done = p.collections_done || 0;
     const cur = p.current_collection;
-    if (cur) return `<span class="font-mono">${escapeHtml(cur)}</span> <span style="color:var(--c-text-subtle)">· ${done} done</span>`;
+    if (cur) return `<span style="color:var(--c-text-subtle)">${verb}</span> <span class="font-mono">${escapeHtml(cur)}</span> <span style="color:var(--c-text-subtle)">· ${done} done</span>`;
     if (done > 0) return `${done} collections done`;
     if (durationSec(j) > 4) return 'working…';
     return 'starting…';
   }
   if (j.state === 'ok') {
     const file = j.message || '';
-    if (file && file.endsWith('.archive.gz')) {
+    if (j.kind === 'backup' && file && file.endsWith('.archive.gz')) {
       const href = `/api/backups/${encodeURIComponent(file)}/download`;
       return `<a href="${href}" class="copyable" title="Download backup">${escapeHtml(file)}</a>`;
     }
     return escapeHtml(j.message || 'completed');
   }
   return `<span title="${escapeHtml(j.message || 'failed')}">${escapeHtml((j.message || 'failed').slice(0, 90))}</span>`;
+}
+
+function kindIcon(j) {
+  const name = j.kind === 'restore' ? 'upload-cloud' : 'archive';
+  return icon(name, { size: 13, className: 'lucide kind-icon' });
+}
+
+function tagFor(j) {
+  if (j.kind === 'restore') return 'restore';
+  if (j.source === 'scheduled') return 'scheduled';
+  return 'manual';
 }
 
 function jobRow(j) {
@@ -98,13 +110,14 @@ function jobRow(j) {
       <div class="job-when">${fmtDur(durationSec(j))}</div>
       <div class="job-target">
         <div class="target-line">
+          ${kindIcon(j)}
           <span class="target-conn" title="${escapeHtml(j.connection_label)}">${escapeHtml(j.connection_label)}</span>
           <span style="color:var(--c-text-subtle)">/</span>
           <span class="target-db" title="${escapeHtml(j.database)}">${escapeHtml(j.database)}</span>
         </div>
         <div class="job-detail">${detailFor(j)}</div>
       </div>
-      <div style="padding-left:0.5rem; color:var(--c-text-subtle); font-size:0.6875rem; text-transform:uppercase; letter-spacing:0.04em;">${j.source}</div>
+      <div class="job-tag" data-kind="${j.kind}">${escapeHtml(tagFor(j))}</div>
     </div>
   `;
 }
@@ -122,8 +135,13 @@ function render() {
   }
 
   const collapsedCls = state.collapsed ? ' collapsed' : '';
+  const restoreCount = running.filter(j => j.kind === 'restore').length;
+  const backupCount = running.length - restoreCount;
+  const labelParts = [];
+  if (backupCount) labelParts.push(`${backupCount} backup${backupCount === 1 ? '' : 's'}`);
+  if (restoreCount) labelParts.push(`${restoreCount} restore${restoreCount === 1 ? '' : 's'}`);
   const headerLabel = running.length > 0
-    ? `<span class="badge badge-running"><span class="badge-dot"></span>${running.length} running</span>`
+    ? `<span class="badge badge-running"><span class="badge-dot"></span>${labelParts.join(' · ')}</span>`
     : `<span class="badge badge-muted"><span class="badge-dot"></span>idle</span>`;
 
   r.innerHTML = `
@@ -131,7 +149,7 @@ function render() {
       <div class="jobs-drawer-head" data-act="toggle">
         <div style="display:flex; align-items:center; gap:0.625rem;">
           ${icon('activity', { size: 16 })}
-          <span style="font-size:0.875rem; font-weight:600;">Backups</span>
+          <span style="font-size:0.875rem; font-weight:600;">Activity</span>
           ${headerLabel}
         </div>
         <button class="btn btn-ghost btn-icon btn-sm" aria-label="Toggle">

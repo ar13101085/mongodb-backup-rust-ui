@@ -1,4 +1,5 @@
 use crate::auth::AuthUser;
+use crate::backup::{JobKind, JobSource, ProgressSink};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use actix_multipart::Multipart;
@@ -6,7 +7,7 @@ use actix_web::{web, HttpResponse};
 use futures_util::TryStreamExt;
 use serde::Deserialize;
 use serde_json::json;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
@@ -32,15 +33,47 @@ pub async fn from_server(
         return Err(AppError::NotFound);
     }
     let uri = resolve_target_uri(&state, body.target_connection_id, body.target_uri.as_deref()).await?;
-    state
+
+    let (target_label, target_db_label) = describe_target(
+        &state,
+        body.target_connection_id,
+        body.target_uri.as_deref(),
+        body.target_database.as_deref(),
+        &archive_path,
+    )
+    .await;
+    let job_id = state
+        .jobs
+        .start(
+            JobKind::Restore,
+            body.target_connection_id,
+            target_label,
+            target_db_label,
+            JobSource::Manual,
+        )
+        .await;
+
+    let outcome = state
         .runner
         .restore(
             &uri,
             &archive_path,
             body.target_database.as_deref(),
             body.drop_existing,
+            Some(ProgressSink {
+                jobs: &state.jobs,
+                job_id,
+            }),
         )
-        .await?;
+        .await;
+
+    let job_result = match &outcome {
+        Ok(()) => Ok(format!("restored from {}", body.filename)),
+        Err(e) => Err(e.to_string()),
+    };
+    state.jobs.finish(job_id, job_result).await;
+
+    outcome?;
     Ok(HttpResponse::Ok().json(json!({ "ok": true })))
 }
 
@@ -132,14 +165,96 @@ pub async fn from_upload(
         }
     };
 
+    let (target_label, target_db_label) = describe_target(
+        &state,
+        target_connection_id,
+        target_uri.as_deref(),
+        target_database.as_deref(),
+        &archive_path,
+    )
+    .await;
+    let job_id = state
+        .jobs
+        .start(
+            JobKind::Restore,
+            target_connection_id,
+            target_label,
+            target_db_label,
+            JobSource::Manual,
+        )
+        .await;
+
     let result = state
         .runner
-        .restore(&uri, &archive_path, target_database.as_deref(), drop_existing)
+        .restore(
+            &uri,
+            &archive_path,
+            target_database.as_deref(),
+            drop_existing,
+            Some(ProgressSink {
+                jobs: &state.jobs,
+                job_id,
+            }),
+        )
         .await;
+
+    let job_result = match &result {
+        Ok(()) => Ok("restored from upload".to_string()),
+        Err(e) => Err(e.to_string()),
+    };
+    state.jobs.finish(job_id, job_result).await;
 
     let _ = fs::remove_file(&archive_path).await;
     result?;
     Ok(HttpResponse::Ok().json(json!({ "ok": true })))
+}
+
+/// Build a friendly (connection_label, database_label) pair to describe the restore target.
+/// Falls back to host from URI / database name parsed from the archive filename.
+async fn describe_target(
+    state: &AppState,
+    connection_id: Option<Uuid>,
+    explicit_uri: Option<&str>,
+    target_database: Option<&str>,
+    archive_path: &Path,
+) -> (String, String) {
+    let conn_label = if let Some(id) = connection_id {
+        state
+            .connections
+            .get(id)
+            .await
+            .map(|c| c.label)
+            .unwrap_or_else(|| "(deleted connection)".to_string())
+    } else if let Some(uri) = explicit_uri {
+        host_from_uri(uri).unwrap_or_else(|| "(custom uri)".to_string())
+    } else {
+        "(unknown target)".to_string()
+    };
+
+    let db_label = match target_database {
+        Some(db) if !db.is_empty() => db.to_string(),
+        _ => archive_source_db(archive_path).unwrap_or_else(|| "(as in archive)".to_string()),
+    };
+
+    (conn_label, db_label)
+}
+
+fn host_from_uri(uri: &str) -> Option<String> {
+    let after_scheme = uri.split_once("://").map(|(_, r)| r).unwrap_or(uri);
+    let after_auth = after_scheme.split_once('@').map(|(_, r)| r).unwrap_or(after_scheme);
+    let host = after_auth
+        .split(|c| c == '/' || c == '?')
+        .next()
+        .unwrap_or("");
+    if host.is_empty() { None } else { Some(host.to_string()) }
+}
+
+/// Backups are named `{conn_uuid}__{db}__{timestamp}.archive.gz`. Extract the db.
+fn archive_source_db(archive_path: &Path) -> Option<String> {
+    let name = archive_path.file_name()?.to_str()?;
+    let stem = name.strip_suffix(".archive.gz").unwrap_or(name);
+    let parts: Vec<&str> = stem.split("__").collect();
+    if parts.len() == 3 { Some(parts[1].to_string()) } else { None }
 }
 
 async fn read_text(field: &mut actix_multipart::Field) -> AppResult<String> {

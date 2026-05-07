@@ -1,4 +1,4 @@
-use crate::backup::{JobSource, ProgressSink};
+use crate::backup::{JobKind, JobSource, ProgressSink};
 use crate::state::AppState;
 use chrono::Utc;
 use std::sync::Arc;
@@ -51,7 +51,13 @@ async fn run_due(state: &Arc<AppState>) -> crate::error::AppResult<()> {
             let started = Utc::now();
             let job_id = state_cloned
                 .jobs
-                .start(conn_id, conn_label, database.clone(), JobSource::Scheduled)
+                .start(
+                    JobKind::Backup,
+                    Some(conn_id),
+                    conn_label,
+                    database.clone(),
+                    JobSource::Scheduled,
+                )
                 .await;
             let outcome = state_cloned
                 .runner

@@ -127,8 +127,8 @@ function targetFields(connOpts, firstConnId) {
 
       ${Field({
         label: 'Restore as database',
-        hint: 'Optional. Restore only this namespace from the archive.',
-        control: Input({ name: 'target_database', mono: true, placeholder: 'leave blank to restore as-is' }),
+        hint: 'Optional. Renames the database during restore (single-database archives only).',
+        control: Input({ name: 'target_database', mono: true, placeholder: 'leave blank to keep original name' }),
       })}
 
       <label class="toggle">
