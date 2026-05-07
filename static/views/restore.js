@@ -1,6 +1,7 @@
 import {
-  $, $$, escapeHtml, fmtBytes, fmtRelative, ensureIcons, icon,
+  $, $$, escapeHtml, fmtBytes, fmtDate, fmtRelative, ensureIcons, icon,
   api, Button, Card, Field, Input, Select, Toggle, Segmented, bindSegmented,
+  RichSelect, bindRichSelects,
   EmptyState, Skeleton, toast, withSpinner,
 } from '/ui.js';
 
@@ -29,7 +30,10 @@ function paint(view) {
   const connOpts = local.connections.map(c => ({ value: c.id, label: c.label }));
   const firstConnId = connOpts[0]?.value || '';
 
-  const fileOpts = local.files.map(f => ({ value: f.filename, label: f.filename }));
+  const archiveOpts = local.files.map(f => ({
+    value: f.filename,
+    content: archiveItemHtml(f),
+  }));
   const firstFile = local.files[0]?.filename || '';
 
   view.innerHTML = `
@@ -49,7 +53,7 @@ function paint(view) {
               : `<form id="form-server" class="space-y-3" novalidate>
                   ${Field({
                     label: 'Archive',
-                    control: Select({ name: 'filename', value: firstFile, options: fileOpts, attrs: { class: 'select input-mono' } }),
+                    control: RichSelect({ name: 'filename', value: firstFile, options: archiveOpts, placeholder: 'Pick an archive' }),
                   })}
                   ${targetFields(connOpts, firstConnId)}
                   <div class="pt-1">
@@ -89,9 +93,34 @@ function paint(view) {
   `;
   ensureIcons(view);
   bindSegmented(view);
+  bindRichSelects(view);
   bindTargetVisibility(view);
   bindServer(view);
   bindUpload(view);
+}
+
+function archiveItemHtml(f) {
+  const connLabel = f.connection_id
+    ? (local.connections.find(c => c.id === f.connection_id)?.label || '(deleted connection)')
+    : '(unknown source)';
+  const db = f.database || '(unknown db)';
+  const when = f.created_at
+    ? `<span title="${escapeHtml(fmtDate(f.created_at))}">${escapeHtml(fmtRelative(f.created_at))}</span>`
+    : '<span>—</span>';
+  return `
+    <div class="ri-icon">${icon('archive', { size: 14 })}</div>
+    <div class="ri-main">
+      <div class="ri-line-1">
+        <span class="ri-db">${escapeHtml(db)}</span>
+        <span class="ri-sep">·</span>
+        <span class="ri-conn">from ${escapeHtml(connLabel)}</span>
+      </div>
+      <div class="ri-line-2">
+        ${when}
+        <span class="ri-size">${escapeHtml(fmtBytes(f.size_bytes))}</span>
+      </div>
+    </div>
+  `;
 }
 
 function targetFields(connOpts, firstConnId) {

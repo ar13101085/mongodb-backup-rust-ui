@@ -191,6 +191,111 @@ export function bindSegmented(root) {
   });
 }
 
+/**
+ * Custom dropdown that supports rich item content.
+ *
+ * options: [{ value: string, content: HTML string }]
+ * The same `content` HTML is used for both the menu item and the trigger label.
+ */
+export function RichSelect({ name, value, options = [], placeholder = 'Select…' } = {}) {
+  const selected = options.find(o => o.value === value) || options[0];
+  const triggerInner = selected
+    ? selected.content
+    : `<span class="rich-select-placeholder">${escapeHtml(placeholder)}</span>`;
+  return `
+    <div class="rich-select" data-name="${escapeHtml(name)}">
+      <button type="button" class="rich-select-trigger" data-act="toggle" aria-haspopup="listbox" aria-expanded="false">
+        <span class="rich-select-value">${triggerInner}</span>
+        ${icon('chevron-down', { size: 16, className: 'rs-chevron' })}
+      </button>
+      <div class="rich-select-menu hidden" role="listbox">
+        ${options.length === 0
+          ? `<div class="rich-select-empty">${escapeHtml(placeholder)}</div>`
+          : options.map(o => `
+              <button type="button" class="rich-select-item${o.value === selected?.value ? ' is-selected' : ''}"
+                      data-value="${escapeHtml(o.value)}" role="option" aria-selected="${o.value === selected?.value}">
+                ${o.content}
+              </button>
+            `).join('')}
+      </div>
+      <input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(selected?.value ?? '')}" />
+    </div>
+  `;
+}
+
+let richSelectOutsideHandler = null;
+export function bindRichSelects(root = document) {
+  $$('.rich-select', root).forEach(rs => {
+    if (rs.dataset.bound === '1') return;
+    rs.dataset.bound = '1';
+
+    const trigger = rs.querySelector('[data-act="toggle"]');
+    const menu = rs.querySelector('.rich-select-menu');
+    const valueEl = rs.querySelector('.rich-select-value');
+    const hidden = rs.querySelector('input[type=hidden]');
+
+    const close = () => {
+      menu.classList.add('hidden');
+      rs.classList.remove('open');
+      trigger.setAttribute('aria-expanded', 'false');
+    };
+    const open = () => {
+      // Close any other open rich-selects first.
+      $$('.rich-select.open').forEach(other => {
+        if (other !== rs) {
+          other.classList.remove('open');
+          other.querySelector('.rich-select-menu')?.classList.add('hidden');
+          other.querySelector('[data-act="toggle"]')?.setAttribute('aria-expanded', 'false');
+        }
+      });
+      menu.classList.remove('hidden');
+      rs.classList.add('open');
+      trigger.setAttribute('aria-expanded', 'true');
+    };
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (rs.classList.contains('open')) close(); else open();
+    });
+
+    menu.querySelectorAll('.rich-select-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hidden.value = item.dataset.value;
+        // Update selected styles
+        menu.querySelectorAll('.rich-select-item').forEach(i => {
+          const sel = i === item;
+          i.classList.toggle('is-selected', sel);
+          i.setAttribute('aria-selected', sel ? 'true' : 'false');
+        });
+        // Update trigger label by cloning the item's inner content
+        valueEl.innerHTML = item.innerHTML;
+        ensureIcons(valueEl);
+        hidden.dispatchEvent(new Event('change', { bubbles: true }));
+        close();
+      });
+    });
+
+    rs.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { close(); trigger.focus(); }
+    });
+  });
+
+  // Single document-level outside-click handler that closes any open rich-select.
+  if (!richSelectOutsideHandler) {
+    richSelectOutsideHandler = (e) => {
+      $$('.rich-select.open').forEach(rs => {
+        if (!rs.contains(e.target)) {
+          rs.classList.remove('open');
+          rs.querySelector('.rich-select-menu')?.classList.add('hidden');
+          rs.querySelector('[data-act="toggle"]')?.setAttribute('aria-expanded', 'false');
+        }
+      });
+    };
+    document.addEventListener('click', richSelectOutsideHandler);
+  }
+}
+
 export function Badge({ tone = 'muted', label = '', withDot = true } = {}) {
   return `<span class="badge badge-${tone}">${withDot ? '<span class="badge-dot"></span>' : ''}${escapeHtml(label)}</span>`;
 }
