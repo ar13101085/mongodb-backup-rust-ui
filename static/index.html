@@ -4,40 +4,75 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>MongoDB Utils</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/styles.css" />
-  </head>
-  <body class="bg-slate-50 text-slate-900 min-h-screen">
-    <div id="app" class="hidden">
-      <header class="border-b bg-white">
-        <div class="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div class="flex items-center gap-6">
-            <h1 class="font-semibold tracking-tight">MongoDB Utils</h1>
-            <nav class="flex gap-1 text-sm">
-              <button data-tab="connections" class="tab px-3 py-1.5 rounded-md hover:bg-slate-100">Connections</button>
-              <button data-tab="backups" class="tab px-3 py-1.5 rounded-md hover:bg-slate-100">Backups</button>
-              <button data-tab="restore" class="tab px-3 py-1.5 rounded-md hover:bg-slate-100">Restore</button>
-            </nav>
-          </div>
-          <div class="flex items-center gap-3 text-sm">
-            <span id="who" class="text-slate-500"></span>
-            <button id="logout" class="px-3 py-1.5 rounded-md border hover:bg-slate-100">Sign out</button>
-          </div>
-        </div>
-      </header>
 
-      <main class="max-w-6xl mx-auto px-4 py-6">
-        <div id="jobs-panel" class="hidden mb-4 bg-white border rounded-lg p-3"></div>
-        <section id="view-connections" class="view"></section>
-        <section id="view-backups" class="view hidden"></section>
-        <section id="view-restore" class="view hidden"></section>
-      </main>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/tailwind-config.js"></script>
+
+    <link rel="stylesheet" href="/app.css" />
+    <script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+  </head>
+  <body>
+    <!-- Initial loader: shown until app.js boots -->
+    <div id="loading" class="min-h-screen flex flex-col items-center justify-center gap-3 text-text-muted">
+      <span class="spinner spinner-lg" style="color: var(--c-accent);"></span>
+      <span class="text-sm">Loading…</span>
     </div>
 
-    <div id="loading" class="min-h-screen flex items-center justify-center text-slate-500">Loading…</div>
+    <!-- App shell: hidden until auth check passes -->
+    <div id="app" class="hidden min-h-screen flex">
+      <aside id="sidebar" class="sidebar">
+        <div class="sidebar-brand">
+          <div class="sidebar-brand-mark">
+            <i data-lucide="database" data-size="16"></i>
+          </div>
+          <span class="sidebar-brand-text">MongoUtils</span>
+        </div>
 
-    <div id="toast" class="fixed bottom-4 right-4 hidden bg-slate-900 text-white text-sm px-3 py-2 rounded-md shadow-lg"></div>
+        <nav class="sidebar-nav" aria-label="Primary">
+          <div class="sidebar-section-label">Manage</div>
+          <button data-nav="connections" class="sidebar-link">
+            <i data-lucide="link"></i>
+            <span class="sidebar-label">Connections</span>
+          </button>
+          <button data-nav="backups" class="sidebar-link">
+            <i data-lucide="archive"></i>
+            <span class="sidebar-label">Backups</span>
+          </button>
+          <button data-nav="restore" class="sidebar-link">
+            <i data-lucide="upload-cloud"></i>
+            <span class="sidebar-label">Restore</span>
+          </button>
+        </nav>
 
-    <script src="/app.js"></script>
+        <div class="sidebar-foot">
+          <button id="user-menu" class="sidebar-user" aria-haspopup="menu">
+            <span id="user-avatar" class="sidebar-avatar">?</span>
+            <span id="user-name" class="sidebar-username">…</span>
+            <i data-lucide="chevron-up" data-size="14"></i>
+          </button>
+        </div>
+      </aside>
+
+      <div class="flex-1 flex flex-col min-w-0">
+        <header class="topbar">
+          <button id="sidebar-toggle" class="btn btn-ghost btn-icon md:hidden" aria-label="Toggle navigation">
+            <i data-lucide="menu"></i>
+          </button>
+          <h1 id="page-title" class="topbar-title">…</h1>
+          <div class="topbar-actions" id="page-actions"></div>
+        </header>
+        <main class="flex-1 overflow-y-auto">
+          <section id="view-root" class="max-w-6xl mx-auto px-6 py-8"></section>
+        </main>
+      </div>
+    </div>
+
+    <div id="jobs-root"></div>
+    <div id="toast-root" class="toast-root"></div>
+
+    <script type="module" src="/app.js"></script>
   </body>
 </html>

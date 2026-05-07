@@ -4,48 +4,89 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Create admin — MongoDB Utils</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/tailwind-config.js"></script>
+    <link rel="stylesheet" href="/app.css" />
+    <script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
   </head>
-  <body class="bg-slate-50 text-slate-900 min-h-screen flex items-center justify-center p-4">
-    <div class="w-full max-w-sm bg-white rounded-xl border shadow-sm p-6">
-      <h1 class="text-lg font-semibold tracking-tight">Create admin</h1>
-      <p class="text-sm text-slate-500 mt-1">First-time setup. This page closes once an admin exists.</p>
-      <form id="form" class="mt-6 space-y-4">
-        <label class="block text-sm">
-          <span class="text-slate-700">Username</span>
-          <input name="username" required minlength="1" maxlength="64"
-            class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
-        </label>
-        <label class="block text-sm">
-          <span class="text-slate-700">Password</span>
-          <input name="password" type="password" required minlength="8"
-            class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
-          <span class="text-xs text-slate-500 mt-1 block">At least 8 characters.</span>
-        </label>
-        <p id="err" class="hidden text-sm text-red-600"></p>
-        <button class="w-full rounded-md bg-slate-900 text-white text-sm py-2 hover:bg-slate-800">Create admin</button>
-      </form>
+  <body class="auth-page">
+    <div class="w-full max-w-sm">
+      <div class="auth-brand">
+        <div class="sidebar-brand-mark"><i data-lucide="database" data-size="16"></i></div>
+        <span class="sidebar-brand-text">MongoUtils</span>
+      </div>
+
+      <div class="auth-card">
+        <div>
+          <h1 class="auth-title">Create admin</h1>
+          <p class="auth-sub">First-time setup. This page closes once an admin exists.</p>
+        </div>
+
+        <form id="form" class="mt-6 space-y-4" novalidate>
+          <div>
+            <label class="field-label" for="username">Username</label>
+            <input id="username" name="username" required minlength="1" maxlength="64" class="input" />
+          </div>
+          <div>
+            <label class="field-label" for="password">Password</label>
+            <input id="password" name="password" type="password" required minlength="8" class="input" />
+            <div class="field-hint">At least 8 characters.</div>
+          </div>
+          <p id="err" class="hidden field-error" style="margin-top:0.75rem"></p>
+          <button id="submit" type="submit" class="btn btn-primary" style="width:100%; padding:0.625rem">
+            <span id="submit-label">Create admin</span>
+          </button>
+        </form>
+      </div>
     </div>
-    <script>
+
+    <script type="module">
+      import { Spinner, ensureIcons } from '/ui.js';
+
+      ensureIcons();
+
       (async () => {
-        const res = await fetch('/api/auth/status').then(r => r.json());
-        if (!res.needs_setup) location.href = res.user ? '/' : '/login.html';
+        try {
+          const res = await fetch('/api/auth/status').then(r => r.json());
+          if (!res.needs_setup) location.href = res.user ? '/' : '/login.html';
+        } catch {}
       })();
 
-      document.getElementById('form').addEventListener('submit', async (e) => {
+      const form = document.getElementById('form');
+      const errEl = document.getElementById('err');
+      const submitBtn = document.getElementById('submit');
+      const submitLabel = document.getElementById('submit-label');
+
+      form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const fd = new FormData(e.target);
+        errEl.classList.add('hidden');
+        const fd = new FormData(form);
         const body = { username: fd.get('username'), password: fd.get('password') };
-        const r = await fetch('/api/auth/setup', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        if (r.ok) { location.href = '/'; return; }
-        const err = document.getElementById('err');
-        const data = await r.json().catch(() => ({}));
-        err.textContent = data.error || 'setup failed';
-        err.classList.remove('hidden');
+
+        submitBtn.disabled = true;
+        submitLabel.innerHTML = `${Spinner()}<span style="margin-left:0.5rem">Creating…</span>`;
+
+        try {
+          const r = await fetch('/api/auth/setup', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+          if (r.ok) { location.href = '/'; return; }
+          const data = await r.json().catch(() => ({}));
+          errEl.textContent = data.error || 'setup failed';
+          errEl.classList.remove('hidden');
+        } catch (err) {
+          errEl.textContent = err.message || 'network error';
+          errEl.classList.remove('hidden');
+        } finally {
+          submitBtn.disabled = false;
+          submitLabel.textContent = 'Create admin';
+        }
       });
     </script>
   </body>
