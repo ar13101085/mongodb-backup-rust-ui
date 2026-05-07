@@ -117,7 +117,11 @@ export function Button({
     ? ic
     : iconRight ? `<span>${escapeHtml(label)}</span>${ic}` : `${ic}<span>${escapeHtml(label)}</span>`;
   const dis = disabled ? ' disabled' : '';
-  return `<button type="${type}" class="${classes}"${attrsToHtml(attrs)}${dis}>${inner}</button>`;
+  // attrs.type takes precedence over the type param so callers can pass type
+  // either way without duplicating the attribute on the rendered <button>.
+  const { type: typeFromAttrs, ...restAttrs } = attrs;
+  const finalType = typeFromAttrs || type;
+  return `<button type="${finalType}" class="${classes}"${attrsToHtml(restAttrs)}${dis}>${inner}</button>`;
 }
 
 export function Card({ title, action = '', body = '', padding = 'pad', className = '' } = {}) {

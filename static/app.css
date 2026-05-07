@@ -421,6 +421,29 @@ dialog[open] { animation: dlg-in 180ms ease; }
   font-size: 0.6875rem;
 }
 
+/* ---------- Inline status banner (used inside dialogs) ---------- */
+
+.status-banner {
+  display: flex; gap: 0.625rem; align-items: flex-start;
+  padding: 0.625rem 0.75rem; border-radius: var(--r-md);
+  border: 1px solid transparent; font-size: 0.8125rem;
+  animation: status-in 160ms ease;
+}
+.status-banner .lucide { flex-shrink: 0; margin-top: 1px; }
+.status-banner .status-title { font-weight: 500; }
+.status-banner .status-detail { color: inherit; opacity: 0.85; margin-top: 0.125rem; line-height: 1.4; word-break: break-word; }
+
+.status-ok { background: var(--c-accent-soft); color: #065f46; border-color: rgba(5,150,105,0.25); }
+.status-err { background: var(--c-danger-soft); color: #991b1b; border-color: rgba(220,38,38,0.25); }
+.status-muted { background: var(--c-surface-sunken); color: var(--c-text-muted); border-color: var(--c-border); }
+
+@keyframes status-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.spin { animation: spin 0.9s linear infinite; }
+
 /* Lucide icons default sizing */
 [data-lucide],
 .lucide { width: 1rem; height: 1rem; }

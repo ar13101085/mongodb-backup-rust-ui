@@ -292,12 +292,12 @@ function connDialog(existing) {
           hint: isEdit ? 'Leave blank to keep the current URI.' : '',
           control: Input({ name: 'uri', placeholder: 'mongodb://user:pass@host:27017', mono: true }),
         })}
-        <p class="err hidden field-error"></p>
+        <div class="status-banner hidden"></div>
       </div>
       <div class="flex justify-end gap-2 mt-5">
-        ${Button({ label: 'Cancel', variant: 'ghost', attrs: { type: 'button', 'data-act': 'cancel' } })}
-        ${Button({ label: 'Test', iconName: 'check-circle', variant: 'secondary', attrs: { type: 'button', 'data-act': 'test' } })}
-        ${Button({ label: isEdit ? 'Save' : 'Create', iconName: 'check', variant: 'primary', attrs: { type: 'submit', 'data-act': 'save' } })}
+        ${Button({ label: 'Cancel', variant: 'ghost', attrs: { 'data-act': 'cancel' } })}
+        ${Button({ label: 'Test', iconName: 'check-circle', variant: 'secondary', attrs: { 'data-act': 'test' } })}
+        ${Button({ label: isEdit ? 'Save' : 'Create', iconName: 'check', variant: 'primary', type: 'submit', attrs: { 'data-act': 'save' } })}
       </div>
     </form>
   `;
@@ -306,31 +306,58 @@ function connDialog(existing) {
     html,
     onMount(dlg, close) {
       const form = dlg.querySelector('form');
-      const errEl = dlg.querySelector('.err');
-      const showErr = (m) => { errEl.textContent = m; errEl.classList.remove('hidden'); };
-      const hideErr = () => errEl.classList.add('hidden');
+      const banner = dlg.querySelector('.status-banner');
+
+      const setBanner = (kind, html) => {
+        const tone = kind === 'ok' ? 'ok' : kind === 'err' ? 'err' : 'muted';
+        banner.className = `status-banner status-${tone}`;
+        banner.innerHTML = html;
+        banner.classList.remove('hidden');
+        ensureIcons(banner);
+      };
+      const clearBanner = () => { banner.classList.add('hidden'); banner.innerHTML = ''; };
+
+      // Reset banner whenever the URI/label changes — old test results are
+      // stale once the user edits the form.
+      form.addEventListener('input', clearBanner);
 
       dlg.querySelector('[data-act="cancel"]').onclick = () => close();
 
       dlg.querySelector('[data-act="test"]').onclick = async (e) => {
-        hideErr();
         const fd = new FormData(form);
         const uri = (fd.get('uri') || '').toString().trim();
-        if (!uri) return showErr('URI required to test');
+        if (!uri) {
+          setBanner('err', `${icon('alert-circle', { size: 14 })}<div><div class="status-title">URI required</div><div class="status-detail">Enter a connection string to test.</div></div>`);
+          return;
+        }
+        setBanner('muted', `${icon('loader', { size: 14, className: 'spin' })}<div><div class="status-title">Testing connection…</div></div>`);
         await withSpinner(e.currentTarget, async () => {
           try {
             const r = await api.post('/api/connections/test', { uri });
-            toast(`connection ok — ${r.databases.length} db(s)`);
-          } catch (err) { showErr(err.message); }
+            const dbs = r.databases || [];
+            const list = dbs.length === 0
+              ? '<div class="status-detail">No user databases found on this connection.</div>'
+              : `<div class="status-detail">${dbs.length} database${dbs.length === 1 ? '' : 's'}: <span class="font-mono">${escapeHtml(dbs.slice(0, 6).join(', '))}${dbs.length > 6 ? `, +${dbs.length - 6} more` : ''}</span></div>`;
+            setBanner('ok', `${icon('check-circle-2', { size: 14 })}<div><div class="status-title">Connection successful</div>${list}</div>`);
+          } catch (err) {
+            setBanner('err', `${icon('alert-circle', { size: 14 })}<div><div class="status-title">Connection failed</div><div class="status-detail">${escapeHtml(err.message)}</div></div>`);
+          }
         }, { busyLabel: 'Testing' });
       };
 
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        hideErr();
         const fd = new FormData(form);
         const label = (fd.get('label') || '').toString().trim();
         const uri = (fd.get('uri') || '').toString().trim();
+        if (!label) {
+          setBanner('err', `${icon('alert-circle', { size: 14 })}<div><div class="status-title">Label required</div></div>`);
+          return;
+        }
+        if (!isEdit && !uri) {
+          setBanner('err', `${icon('alert-circle', { size: 14 })}<div><div class="status-title">URI required</div></div>`);
+          return;
+        }
         const submitBtn = form.querySelector('[data-act="save"]');
         await withSpinner(submitBtn, async () => {
           try {
@@ -343,7 +370,9 @@ function connDialog(existing) {
             toast(isEdit ? 'saved' : 'connection added');
             const view = $('#view-root');
             if (view) await render(view);
-          } catch (err) { showErr(err.message); }
+          } catch (err) {
+            setBanner('err', `${icon('alert-circle', { size: 14 })}<div><div class="status-title">Save failed</div><div class="status-detail">${escapeHtml(err.message)}</div></div>`);
+          }
         }, { busyLabel: isEdit ? 'Saving' : 'Creating' });
       });
     },
