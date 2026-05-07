@@ -25,6 +25,10 @@ Everything runs on your own server — no third-party service, no cloud account.
 - **No database to host.** State lives in plain JSON files on disk — no
   Postgres or Redis to run alongside.
 
+# download and setup deb file mongodb database tools from
+
+https://mongodb.com/try/download/bi-connector
+
 ## Status
 
 Early but functional. Expect rough edges; issues and PRs welcome.
